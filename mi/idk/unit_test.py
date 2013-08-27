@@ -103,16 +103,16 @@ from ooi.logging import log
 # Do not remove this import.  It is for package building.
 from mi.core.instrument.zmq_driver_process import ZmqDriverProcess
 
-#AGENT_DISCOVER_TIMEOUT=900
-#GO_ACTIVE_TIMEOUT=900
-#GET_TIMEOUT=900
-#SET_TIMEOUT=900
-#EXECUTE_TIMEOUT=900
-AGENT_DISCOVER_TIMEOUT=180
-GO_ACTIVE_TIMEOUT=400
-GET_TIMEOUT=30
-SET_TIMEOUT=90
-EXECUTE_TIMEOUT=30
+AGENT_DISCOVER_TIMEOUT=900
+GO_ACTIVE_TIMEOUT=900
+GET_TIMEOUT=900
+SET_TIMEOUT=900
+EXECUTE_TIMEOUT=900
+#AGENT_DISCOVER_TIMEOUT=180
+#GO_ACTIVE_TIMEOUT=400
+#GET_TIMEOUT=180
+#SET_TIMEOUT=180
+#EXECUTE_TIMEOUT=180
 SAMPLE_RAW_DATA="Iam Apublished Message"
 
 LOCALHOST='localhost'
@@ -135,12 +135,12 @@ class ParameterTestConfigKey(BaseEnum):
     TYPE = 'type'
     REQUIRED = 'required'
     NAME = 'name'
-    VALUE = 'value'
     DIRECT_ACCESS = 'directaccess'
     STARTUP = 'startup'
     READONLY = 'readonly'
     DEFAULT = 'default'
     STATES = 'states'
+    VALUE = 'value'
 
 class InstrumentDriverTestConfig(Singleton):
     """
@@ -280,7 +280,100 @@ class DriverTestMixin(MiUnitTest):
         self.assert_data_particle_header(data_particle, CommonDataParticleType.RAW)
         self.assert_data_particle_parameters(data_particle, self._raw_sample_parameters, verify_values)
 
-    def assert_data_particle_parameters(self, data_particle, param_dict, verify_values = False):
+    def convert_data_particle_to_dict(self, data_particle):
+        """
+        Convert a data particle object to a dict.  This will work for data particles as
+        DataParticle object, dictionaries or a string
+        @param data_particle: data particle
+        @return: dictionary representation of a data particle
+        """
+        if (isinstance(data_particle, DataParticle)):
+            sample_dict = json.loads(data_particle.generate(sorted=True))
+        elif (isinstance(data_particle, str)):
+            sample_dict = json.loads(data_particle)
+        elif (isinstance(data_particle, dict)):
+            sample_dict = data_particle
+        else:
+            raise IDKException("invalid data particle type: %s", type(data_particle))
+
+        return sample_dict
+
+    def get_data_particle_values_as_dict(self, data_particle):
+        """
+        Return all of the data particle values as a dictionary with the value id as the key and the value as the
+        value.  This method will decimate the data, in the any characteristics other than value id and value.  i.e.
+        binary.
+        @param: data_particle: data particle to inspect
+        @return: return a dictionary with keys and values { value-id: value }
+        @raise: IDKException when missing values dictionary
+        """
+        sample_dict = self.convert_data_particle_to_dict(data_particle)
+
+        values = sample_dict.get('values')
+        if(not values):
+            raise IDKException("Data particle missing values")
+
+        if(not isinstance(values, list)):
+            raise IDKException("Data particle values not a list")
+
+        result = {}
+        for param in values:
+            if(not isinstance(param, dict)):
+                raise IDKException("must be a dict")
+
+            key = param.get('value_id')
+            if(key == None):
+                raise IDKException("value_id not defined")
+
+            if(key in result.keys()):
+                raise IDKException("duplicate value detected for %s" % key)
+
+            result[key] = param.get('value')
+
+        return result
+
+    def assert_data_particle_keys(self, data_particle_key, test_config):
+        """
+        Ensure that the keys defined in the data particle key enum match
+        the keys defined in the test configuration.
+        @param data_particle_key: object that defines all data particle keys.
+        @param test_config: dictionary containing parameter verification values
+        """
+        driver_keys = sorted(data_particle_key.list())
+        test_config_keys = sorted(test_config.keys())
+
+        self.assertEqual(driver_keys, test_config_keys)
+
+    def assert_data_particle_header(self, data_particle, stream_name, require_instrument_timestamp=False):
+        """
+        Verify a data particle header is formatted properly
+        @param data_particle: version 1 data particle
+        @param stream_name: version 1 data particle
+        @param require_instrument_timestamp: should we verify the instrument timestamp exists
+        """
+        sample_dict = self.convert_data_particle_to_dict(data_particle)
+        log.debug("SAMPLEDICT: %s", sample_dict)
+
+        self.assertTrue(sample_dict[DataParticleKey.STREAM_NAME], stream_name)
+        self.assertTrue(sample_dict[DataParticleKey.PKT_FORMAT_ID], DataParticleValue.JSON_DATA)
+        self.assertTrue(sample_dict[DataParticleKey.PKT_VERSION], 1)
+        self.assertIsInstance(sample_dict[DataParticleKey.VALUES], list)
+
+        self.assertTrue(sample_dict.get(DataParticleKey.PREFERRED_TIMESTAMP))
+
+        self.assertIsNotNone(sample_dict.get(DataParticleKey.DRIVER_TIMESTAMP))
+        self.assertIsInstance(sample_dict.get(DataParticleKey.DRIVER_TIMESTAMP), float)
+
+        # It is highly unlikely that we should have a particle without a port agent timestamp,
+        # at least that's the current assumption.
+        self.assertIsNotNone(sample_dict.get(DataParticleKey.PORT_TIMESTAMP))
+        self.assertIsInstance(sample_dict.get(DataParticleKey.PORT_TIMESTAMP), float)
+
+        if(require_instrument_timestamp):
+            self.assertIsNotNone(sample_dict.get(DataParticleKey.INTERNAL_TIMESTAMP))
+            self.assertIsInstance(sample_dict.get(DataParticleKey.INTERNAL_TIMESTAMP), float)
+
+    def assert_data_particle_parameters(self, data_particle, param_dict, verify_values=False):
         """
         Verify data partice parameters.  Does a quick conversion of the values to a dict
         so that common methods can operate on them.
@@ -290,7 +383,7 @@ class DriverTestMixin(MiUnitTest):
         @param verify_values bool should ve verify parameter values
         """
         sample_dict = self.get_data_particle_values_as_dict(data_particle)
-        self.assert_parameters(sample_dict,param_dict,verify_values)
+        self.assert_parameters(sample_dict, param_dict, verify_values)
 
     def assert_driver_parameter_definition(self, driver, param_dict):
         """
@@ -899,24 +992,44 @@ class InstrumentDriverTestCase(MiIntTestCase):
         """
         comm_config = self.get_comm_config()
 
-        config = {
-            'port_agent_addr' : comm_config.host,
-            'device_addr' : comm_config.device_addr,
+        if ConfigTypes.SERIAL == comm_config.method():
+            config = {
+                'port_agent_addr': comm_config.host,
+                'device_os_port': comm_config.device_os_port,
+                'device_baud': comm_config.device_baud,
+                'device_data_bits': comm_config.device_data_bits,
+                'device_stop_bits': comm_config.device_stop_bits,
+                'device_flow_control': comm_config.device_flow_control,
+                'device_parity': comm_config.device_parity,
+                'command_port': comm_config.command_port,
+                'data_port': comm_config.data_port,
 
-            'command_port': comm_config.command_port,
-            'data_port': comm_config.data_port,
+                'telnet_sniffer_port': comm_config.sniffer_port,
 
-            'telnet_sniffer_port': comm_config.sniffer_port,
+                'process_type': PortAgentProcessType.UNIX,
+                'log_level': 5,
+                }
+        else:
+            config = {
+                'port_agent_addr' : comm_config.host,
+                'device_addr' : comm_config.device_addr,
 
-            'process_type': PortAgentProcessType.UNIX,
-            'log_level': 5,
-            }
+                'command_port': comm_config.command_port,
+                'data_port': comm_config.data_port,
+
+                'telnet_sniffer_port': comm_config.sniffer_port,
+
+                'process_type': PortAgentProcessType.UNIX,
+                'log_level': 5,
+                }
+
+        config['instrument_type'] = comm_config.method()
 
         if ConfigTypes.BOTPT == comm_config.config_type:
             config['instrument_type'] = ConfigTypes.BOTPT
             config['device_tx_port'] = comm_config.device_tx_port
             config['device_rx_port'] = comm_config.device_rx_port
-        else:
+        elif ConfigTypes.ETHERNET == comm_config.config_type:
             config['device_port'] = comm_config.device_port
 
         if(comm_config.sniffer_prefix): config['telnet_sniffer_prefix'] = comm_config.sniffer_prefix
@@ -938,7 +1051,6 @@ class InstrumentDriverTestCase(MiIntTestCase):
         log.debug("Startup Port Agent")
 
         config = self.port_agent_config()
-        log.debug("port agent config: %s", config)
 
         port_agent = PortAgentProcess.launch_process(config, timeout = 60, test_mode = True)
 
@@ -1633,8 +1745,8 @@ class InstrumentDriverIntegrationTestCase(InstrumentDriverTestCase):   # Must in
             self.clear_events()
             self.assert_set(param, value, True)
             time.sleep(1)
-            log.debug("pass #2 got config change events: %d", len(events))
             events = self.get_events(DriverAsyncEvent.CONFIG_CHANGE)
+            log.debug("pass #2 got config change events: %d", len(events))
             self.assertEqual(len(events), 0)
 
             self.assert_get(param, value)
@@ -2311,7 +2423,7 @@ class InstrumentDriverQualificationTestCase(InstrumentDriverTestCase):
         expected_res_param.sort()
         expected_res_int = capabilities.get(AgentCapabilityType.RESOURCE_INTERFACE)
         expected_res_int.sort()
-        
+
         # go get the active capabilities
         retval = self.instrument_agent_client.get_capabilities()
         agt_cmds, agt_pars, res_cmds, res_iface, res_pars = sort_capabilities(retval)
@@ -2326,7 +2438,7 @@ class InstrumentDriverQualificationTestCase(InstrumentDriverTestCase):
         log.debug("Compared to: %s", expected_res_int)
         log.debug("Resource Parameter: %s ", str(res_pars))
         log.debug("Compared to: %s", expected_res_param)
-        
+
         # Compare to what we are supposed to have
         self.assertEqual(expected_agent_cmd, agt_cmds)
         self.assertEqual(expected_agent_param, agt_pars)
@@ -2360,10 +2472,9 @@ class InstrumentDriverQualificationTestCase(InstrumentDriverTestCase):
         for i in range(0, sample_count):
             cmd = AgentCommand(command=command)
             reply = self.instrument_agent_client.execute_resource(cmd, timeout=timeout)
-
         # Watch the parsed data queue and return once three samples
         # have been read or the default timeout has been reached.
-        samples = self.data_subscribers.get_samples(sample_queue, sample_count, timeout = timeout)
+        samples = self.data_subscribers.get_samples(sample_queue, sample_count, timeout=timeout)
         self.assertGreaterEqual(len(samples), sample_count)
         log.trace("SAMPLE: %s", samples)
 
