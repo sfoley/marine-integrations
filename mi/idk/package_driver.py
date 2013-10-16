@@ -153,22 +153,24 @@ class PackageDriver(object):
         if not os.path.exists(REPODIR):
             os.mkdir(REPODIR)
         os.chdir(REPODIR)
+        mi_dir = os.path.join(REPODIR, 'marine-integrations')
         # remove an old clone if one exists, start clean
-        if os.path.exists(REPODIR + '/marine-integrations'):
-            shutil.rmtree(REPODIR + '/marine-integrations')
+        if os.path.exists(mi_dir):
+            shutil.rmtree(mi_dir)
 
         # clone the ooici repository into a temporary location
-        log.debug('Attempting to clone repository into %s, REPODIR set to %s',
-                  os.getcwd(), REPODIR)
+        log.debug('Attempting to clone repository into CWD: %s, REPODIR set to %s, MI dir %s',
+                  os.getcwd(), REPODIR, mi_dir)
         ret = os.system('git clone git@github.com:ooici/marine-integrations.git')
         if ret < 0:
-            raise GitCommandException("Bad return from git command")
+            raise GitCommandException("Bad return from git command: %s" % ret)
 
         # if the directory doesn't exist, something went wrong with cloning
-        if not os.path.exists(REPODIR + '/marine-integrations'):
-            raise GitCommandException('Error creating ooici repository clone with base: %s' % REPODIR)
+
+        if not os.path.exists(mi_dir):
+            raise GitCommandException('Error creating ooici repository clone with base %s. Contents of repo dir are %s' % (REPODIR, os.listdir(REPODIR)))
         # navigate into the cloned repository
-        os.chdir(REPODIR + '/marine-integrations')
+        os.chdir(mi_dir)
         log.debug('in cloned repository')
 
     def get_repackage_version(self, tag_base):

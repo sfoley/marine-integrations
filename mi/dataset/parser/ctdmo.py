@@ -11,10 +11,7 @@ __author__ = 'Emily Hahn'
 __license__ = 'Apache 2.0'
 
 import binascii
-import array
-import string
 import re
-import time
 import ntplib
 from dateutil import parser
 from mi.core.log import get_logger ; log = get_logger()

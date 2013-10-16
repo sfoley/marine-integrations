@@ -120,16 +120,17 @@ class ConfigManager(Singleton):
         ### installed doesn't support remotes. 
         origin = idk_repo
 
-        log.debug( "Does '%s' contain '%s'", origin, MI_REPO_NAME)
+        log.debug( "Does '%s' contain '%s'?", origin, MI_REPO_NAME)
         # Added second criteria as a quick fix to get buildbot working.  Need a better
         # way of identifing the idk dir
+        log.debug("Repo dir contents: %s", os.listdir(origin))
         if origin.find(MI_REPO_NAME) < 0 and origin.find('/build') < 0:
             # Maybe we wound up close, so try a quick change, then fail
             try:
                 os.chdir(MI_REPO_NAME)
                 origin = os.getcwd()
             except:
-                raise IDKWrongRunningDirectory(msg="Please run this process from the root your local MI git repository")
+                raise IDKWrongRunningDirectory(msg="Please run this process from the root your local MI git repository. Attempted from %s" % origin)
                 
             if origin.find(MI_REPO_NAME) < 0 and origin.find('/build') < 0:
                 raise IDKWrongRunningDirectory(msg="Please run this process from the root your local MI git repository")
