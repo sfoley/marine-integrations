@@ -60,7 +60,7 @@ class ConfigManager(Singleton):
         self.yaml = dict()
         self.yaml[IDK_YAML_GROUP] = dict()
 
-        log.debug("config dir: %s" % config_dir)
+        log.debug("config dir: %s", config_dir)
         self.config_dir = config_dir
 
         if not os.path.isdir(config_dir):
@@ -82,7 +82,7 @@ class ConfigManager(Singleton):
         self.read_config([cfgpath])
 
         if not self.get("working_repo"):
-            log.debug("working_repo config option doesn't exist: " + cfgpath)
+            log.debug("working_repo config option doesn't exist: %s", cfgpath)
             self.rebase()
 
         if not os.path.exists(self.get("working_repo")):
@@ -95,7 +95,6 @@ class ConfigManager(Singleton):
 
         self.read_config([ os.path.join(self.get("working_repo"), DEFAULT_CONFIG),
                            cfgpath ])
-        pass
 
     def read_config(self, config_list):
         config = mi.core.common.Config(config_list)
@@ -113,7 +112,7 @@ class ConfigManager(Singleton):
         
         # We assume we are in the root of the local repository directory because
         # DEFAULT_CONFIG is a relative path from there
-        log.debug("Check for GIT information in: " + os.curdir);
+        log.debug("Check for GIT information in: %s", idk_repo);
         # TODO add git check
 
         ### This would be nice to ultimately pull from the repo object, but the version of gitpython

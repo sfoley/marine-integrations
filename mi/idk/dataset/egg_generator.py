@@ -19,9 +19,9 @@ from os.path import exists, dirname
 from shutil import copytree
 from mi.idk import prompt
 import mi.idk.egg_generator
-from mi.idk.egg_generator import DependencyList
+from mi.idk.egg_generator import DependencyList, REPODIR
 
-from mi.idk.exceptions import ValidationFailure
+from mi.idk.exceptions import ValidationFailure, InvalidParameters, IDKException
 from mi.idk.config import Config
 
 from mi.idk.dataset.metadata import Metadata
@@ -58,14 +58,15 @@ class EggGenerator(mi.idk.egg_generator.EggGenerator):
     Generate driver egg
     """
     
-    def __init__(self, metadata):
+    def __init__(self, metadata, repo_dir=REPODIR):
         """
         @brief Constructor
         @param metadata IDK Metadata object
         """
         self.metadata = metadata
         self._bdir = None
-        self._repodir = mi.idk.egg_generator.REPODIR
+
+        self._repodir = repo_dir
 
         if not self._tmp_dir():
             raise InvalidParameters("missing tmp_dir configuration")
@@ -78,6 +79,10 @@ class EggGenerator(mi.idk.egg_generator.EggGenerator):
 
     def _build_name(self):
         return self.metadata.driver_name_versioned
+
+    def _versioned_dir(self):
+        return os.path.join(self._build_dir(),
+                            self._build_name())
 
     def _driver_dir(self):
         (driver_dir, driver_fname) = os.path.split(self.metadata.driver_path)
@@ -156,41 +161,43 @@ class EggGenerator(mi.idk.egg_generator.EggGenerator):
             destdir = dirname(dest)
             source = os.path.join(self._repo_dir(), filename)
 
-            log.debug(" Copy %s => %s" % (source, dest))
-            # make sure the destination directory exists, if it doesn't make it
-            if not os.path.exists(destdir):
-                os.makedirs(destdir)
+            if os.path.exists(source):
+                log.debug(" Copy %s => %s" % (source, dest))
+                # make sure the destination directory exists, if it doesn't make it
+                if not os.path.exists(destdir):
+                    os.makedirs(destdir)
+    
+                # copy the file
+                shutil.copy(source, dest)
 
-            # copy the file
-            shutil.copy(source, dest)
-
-            # replace mi in the copied files with the versioned driver module.mi
-            # this is necessary because the top namespace in the versioned files starts
-            # with the versioned driver name directory, not mi
-            driver_file = open(dest, "r")
-            contents = driver_file.read()
-            driver_file.close()
-            new_contents = re.sub(r'(^import |^from |\'|= )mi\.|res/config/mi-logging|\'mi\'',
-                                  self._mi_replace,
-                                  contents,
-                                  count=0,
-                                  flags=re.MULTILINE)
-            driver_file = open(dest, "w")
-            driver_file.write(new_contents)
-            driver_file.close()
+                # replace mi in the copied files with the versioned driver module.mi
+                # this is necessary because the top namespace in the versioned files starts
+                # with the versioned driver name directory, not mi
+                driver_file = open(dest, "r")
+                contents = driver_file.read()
+                driver_file.close()
+                new_contents = re.sub(r'(^import |^from |\'|= )mi\.|res/config/mi-logging|\'mi\'',
+                                      self._mi_replace,
+                                      contents,
+                                      count=0,
+                                      flags=re.MULTILINE)
+                driver_file = open(dest, "w")
+                driver_file.write(new_contents)
+                driver_file.close()
 
         # need to add mi-logging.yml special because it is not in cloned repo, only in local repository
-        milog = "res/config/mi-logging.yml"
-        dest = os.path.join(self._versioned_dir(), milog)
+        milog = "mi-logging.yml"
+        dest = os.path.join(self._res_config_dir(), milog)
         destdir = dirname(dest)
-        source = os.path.join(Config().base_dir(), milog)
+        source = os.path.join(Config().base_dir(), "res/config/", milog)
 
         log.debug(" Copy %s => %s" % (source, dest))
         # make sure the destination directory exists, if it doesn't make it
         if not os.path.exists(destdir):
             os.makedirs(destdir)
 
-        shutil.copy(source, dest)
+        if os.path.exists(source):
+            shutil.copy(source, dest)
 
     def _mi_replace(self, matchobj):
         """

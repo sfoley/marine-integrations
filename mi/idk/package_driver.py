@@ -24,6 +24,8 @@ from mi.idk.exceptions import InvalidParameters
 from mi.idk.exceptions import GitCommandException
 
 REPODIR = '/tmp/repoclone'
+READ_REPO_URL = 'git://github.com/ooici/marine-integrations'
+WRITE_REPO_URL = 'https://github.com/ooici/marine-integrations.git'
 
 class PackageManifest(object):
     """
@@ -118,10 +120,11 @@ class PackageDriver(object):
     ###
     #   Public Methods
     ###
-    def __init__(self):
+    def __init__(self, test_mode=False):
         """
         @brief ctor
         """
+        self.test_mode = test_mode
         self._zipfile = None
         self._manifest = None
         self._compression = None
@@ -161,7 +164,7 @@ class PackageDriver(object):
         # clone the ooici repository into a temporary location
         log.debug('Attempting to clone repository into CWD: %s, REPODIR set to %s, MI dir %s',
                   os.getcwd(), REPODIR, mi_dir)
-        ret = os.system('git clone git@github.com:ooici/marine-integrations.git')
+        ret = os.system('git clone %s' % READ_REPO_URL)
         if ret < 0:
             raise GitCommandException("Bad return from git command: %s" % ret)
 
@@ -177,8 +180,12 @@ class PackageDriver(object):
         """
         Get the driver version the user wants to repackage
         """
-        # suggest the current driver version as default
-        repkg_version = prompt.text( 'Driver Version to re-package', self.metadata.version )
+        if self.test_mode:
+            repkg_version = self.metadata.version
+        else:            
+            # suggest the current driver version as default
+            repkg_version = prompt.text( 'Driver Version to re-package', self.metadata.version )
+            
         # confirm this version has the correct format
         self._verify_version(repkg_version)
         # check to make sure this driver version exists
@@ -220,7 +227,11 @@ class PackageDriver(object):
         last_dot = self.metadata.version.rfind('.')
         last_version = int(self.metadata.version[last_dot+1:])
         suggest_version = self.metadata.version[:last_dot+1] + str(last_version + 1)
-        new_version = prompt.text('Update Driver Version', suggest_version )
+        if self.test_mode:
+            new_version = suggest_version
+        else:
+            new_version = prompt.text('Update Driver Version', suggest_version )
+            
         # confirm this version has the correct format
         self._verify_version(new_version)
         if new_version != self.metadata.version:
@@ -264,7 +275,11 @@ class PackageDriver(object):
                                  tmp_metadata.driver_model,
                                  tmp_metadata.driver_name,
                                  REPODIR + '/marine-integrations')
-        
+        if self.test_mode:
+            #sys.argv.append("--repackage")
+            sys.argv.append("--no-test")
+            sys.argv.append("--no-push")
+
         if "--repackage" in sys.argv:
             self.get_repackage_version(self.build_name())
         else:
@@ -282,7 +297,7 @@ class PackageDriver(object):
                 self.package_driver()
                 
         if not "--no-push" in sys.argv and not "--repackage" in sys.argv:
-            cmd = 'git push'
+            cmd = 'git push %s' % WRITE_REPO_URL
             output = subprocess.check_output(cmd, shell=True)
             if len(output) > 0:
                 log.debug('git push returned: %s', output)
@@ -379,7 +394,10 @@ class PackageDriver(object):
             for file in os.listdir(resource_dir):
                 if file != stringfile:
                     log.debug("    ++ found: " + file)
-                    desc = prompt.text('Describe ' + file)
+                    if self.test_mode:
+                        desc = " "
+                    else:
+                        desc = prompt.text('Describe ' + file)
                     self._add_file(resource_dir + "/" + file, 'resource', desc)
         else:
             log.debug(" --- No resource directory found, skipping...")

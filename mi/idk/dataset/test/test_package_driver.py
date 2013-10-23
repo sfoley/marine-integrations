@@ -195,7 +195,7 @@ class TestPackageDriver(MiUnitTest):
         metadata = Metadata()
     
         # create the egg with the package driver
-        package_driver = PackageDriver()
+        package_driver = PackageDriver(test_mode=True)
         package_driver.run()
         
         startup_config = {

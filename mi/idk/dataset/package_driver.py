@@ -18,6 +18,8 @@ from mi.idk.dataset.driver_generator import DriverGenerator
 from mi.idk.dataset.egg_generator import EggGenerator
 
 REPODIR = '/tmp/repoclone'
+READ_REPO_URL = 'git://github.com/ooici/marine-integrations'
+WRITE_REPO_URL = 'https://github.com/ooici/marine-integrations.git'
 
 class PackageDriver(mi.idk.package_driver.PackageDriver):
 
@@ -28,10 +30,11 @@ class PackageDriver(mi.idk.package_driver.PackageDriver):
     ###
     #   Public Methods
     ###
-    def __init__(self):
+    def __init__(self, test_mode=False):
         """
         @brief ctor
         """
+        self.test_mode = test_mode
         self._zipfile = None
         self._manifest = None
         self._compression = None
@@ -63,7 +66,10 @@ class PackageDriver(mi.idk.package_driver.PackageDriver):
         last_dot = self.metadata.version.rfind('.')
         last_version = int(self.metadata.version[last_dot+1:])
         suggest_version = self.metadata.version[:last_dot+1] + str(last_version + 1)
-        new_version = prompt.text('Update Driver Version', suggest_version )
+        if self.test_mode:
+            new_version = suggest_version
+        else:
+            new_version = prompt.text('Update Driver Version', suggest_version )
         # make sure the entered version has the correct format
         self._verify_version(new_version)
         if new_version != self.metadata.version:
@@ -98,6 +104,11 @@ class PackageDriver(mi.idk.package_driver.PackageDriver):
         # read metadata from the cloned repo
         self.metadata = Metadata(tmp_metadata.driver_path, REPODIR + '/marine-integrations')
 
+        if self.test_mode:
+            #sys.argv.append("--repackage")
+            sys.argv.append("--no-push")
+        log.debug("test mode: %s, argv: %s", self.test_mode, sys.argv)
+
         # for now leave out the test option until test are more stable,
         # just build the package driver
         if "--repackage" in sys.argv:
@@ -109,7 +120,7 @@ class PackageDriver(mi.idk.package_driver.PackageDriver):
             self.package_driver()
 
             if not "--no-push" in sys.argv:
-                cmd = 'git push'
+                cmd = 'git push %s' % WRITE_REPO_URL
                 output = subprocess.check_output(cmd, shell=True)
                 if len(output) > 0:
                     log.debug('git push returned: %s', output)

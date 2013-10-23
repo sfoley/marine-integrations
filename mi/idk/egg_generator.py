@@ -512,22 +512,18 @@ class EggGenerator:
         if not os.path.exists(self._versioned_dir()):
             os.makedirs(self._versioned_dir())
 
-
         # need to add mi-logging.yml special because it is not in cloned repo, only in local repository
         milog = "mi-logging.yml"
         dest = os.path.join(self._res_config_dir(), milog)
         destdir = dirname(dest)
         source = os.path.join(Config().base_dir(), "res/config/" + milog)
 
-        log.debug(" Copy %s => %s" % (source, dest))
-        # make sure the destination directory exists, if it doesn't make it
-        if not os.path.exists(destdir):
-            os.makedirs(destdir)
-        # Now that it exists, make the package scanner find it           
-        self._create_file(os.path.join(self._res_dir(), "__init__.py"))
-        self._create_file(os.path.join(self._res_config_dir(), "__init__.py"))        
-
-        shutil.copy(source, dest)
+        if os.path.exists(source):
+            log.debug(" Copy %s => %s" % (source, dest))
+            # make sure the destination directory exists, if it doesn't make it
+            if not os.path.exists(destdir):
+                os.makedirs(destdir)
+            shutil.copy(source, dest)
 
         # we need to make sure an init file is in the versioned dir and
         # resource directories so that find_packages() will look in here
@@ -535,13 +531,10 @@ class EggGenerator:
                           os.path.join(self._res_dir(), "__init__.py"),
                           os.path.join(self._res_config_dir(), "__init__.py")]
 
-        if not os.path.exists(self._res_dir()):
-            os.makedirs(self._res_dir())
-        if not os.path.exists(self._res_config_dir()):
-            os.makedirs(self._res_config_dir())
-
         for file in init_file_list:
             self._create_file(file)
+            if file in files:
+                files.remove(file) # If we add it here, remove it from our list
             
         for file in files:
             dest = os.path.join(self._versioned_dir(), file)
