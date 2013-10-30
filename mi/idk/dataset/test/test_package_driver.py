@@ -19,7 +19,7 @@ import sys
 import os
 import re
 import pkg_resources
-from os.path import exists
+from os.path import exists, lexists
 
 from mi.idk.config import Config
 
@@ -186,7 +186,8 @@ class TestPackageDriver(MiUnitTest):
         log.info("linking %s to %s", ctd_md_path, current_dsa_path)
         # exists doesn't catch when this link is broken but still there,
         # need to figure out how to find and delete
-        if exists(current_dsa_path):
+        if lexists(current_dsa_path):
+            log.debug("Removing target path %s", current_dsa_path)
             os.remove(current_dsa_path)
         
         os.symlink(ctd_md_path, current_dsa_path)
