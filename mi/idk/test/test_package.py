@@ -66,7 +66,7 @@ class IDKPackageNose(MiUnitTest):
         self.write_implfile()
         self.write_nosefile()
         self.write_resfile()
-        
+            
     def write_basefile(self):
         """
         Create all of the base python modules.  These files live in the same root
@@ -171,7 +171,7 @@ class IDKPackageNose(MiUnitTest):
         # The rest are py file imports.
         ofile.write( "hello world\n")
         ofile.close()
-        
+
     def basefile(self):
         """
         The main base python file imported by the target file.
@@ -337,8 +337,7 @@ class TestDriverFileList(IDKPackageNose):
         self.assertTrue(filelist)
         
         known_files = [
-            '%s/res/test_file' % TESTDIR,
-            '%s/resource/__init__.py' % TESTDIR
+            '%s/res/test_file' % TESTDIR
         ]
         
         files = filelist._extra_files()
@@ -363,7 +362,6 @@ class TestDriverFileList(IDKPackageNose):
                       'mi/base3.py',
                       'mi/base4.py',
                       'mi/foo/__init__.py',
-                      'mi/foo/resource/__init__.py',
                       'mi/foo/impl.py',
                       'mi/foo/res/test_file',
                       'mi/foo/test/__init__.py',
@@ -371,7 +369,7 @@ class TestDriverFileList(IDKPackageNose):
                       ]
         
         files = filelist.files()
-        #log.debug( "F: %s" % files)
+        log.debug("*** Files: %s", files)
 
         self.assertEqual(sorted(files), sorted(known_files))
 

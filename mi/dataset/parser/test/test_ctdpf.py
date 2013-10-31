@@ -277,4 +277,4 @@ GPS2:
         self.assert_result(result, 137, self.base_timestamp, self.particle_a)
 
         result = self.parser.get_records(1)
-        self.assert_result(result, 194, self.base_timestamp+60, self.particle_e)
+        self.assert_result(result, 193, self.base_timestamp+60, self.particle_e)

@@ -87,6 +87,7 @@ class CtdmoParserDataParticle(DataParticle):
         Quick equality check for testing purposes. If they have the same raw
         data, timestamp, and new sequence, they are the same enough for this particle
         """
+        log.debug("Equality checking CTDMO data particle")
         if ((self.raw_data == arg.raw_data) and \
             (self.contents[DataParticleKey.INTERNAL_TIMESTAMP] == arg.contents[DataParticleKey.INTERNAL_TIMESTAMP]) and \
             (self.contents[DataParticleKey.NEW_SEQUENCE] == arg.contents[DataParticleKey.NEW_SEQUENCE])):
@@ -95,7 +96,10 @@ class CtdmoParserDataParticle(DataParticle):
             if self.raw_data != arg.raw_data:
                 log.debug('Raw data does not match')
             elif self.contents[DataParticleKey.INTERNAL_TIMESTAMP] != arg.contents[DataParticleKey.INTERNAL_TIMESTAMP]:
-                log.debug('Timestamp does not match')
+                log.debug('Timestamp %s does not match %s',
+                          self.contents[DataParticleKey.INTERNAL_TIMESTAMP],
+                          arg.contents[DataParticleKey.INTERNAL_TIMESTAMP])
+                          
             elif self.contents[DataParticleKey.NEW_SEQUENCE] != arg.contents[DataParticleKey.NEW_SEQUENCE]:
                 log.debug('Sequence does not match')
             return False

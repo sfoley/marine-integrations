@@ -200,6 +200,7 @@ class ResultSet(object):
         if len(errors):
             self._add_to_report("Header verification failure")
             self._add_to_report(errors, 1)
+            log.debug("Result set verify encountered errors: %s", errors)
             return False
 
         return True
